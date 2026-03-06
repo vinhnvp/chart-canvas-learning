@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Bitcoin Tracker</title>
+    <style>
+        /* === STYLE CSS HIỆN ĐẠI (DARK THEME) === */
+        :root {
+            --bg-dark: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #f59e0b; /* Màu vàng cam đặc trưng của Bitcoin */
+            --up-color: #10b981; /* Xanh lá khi giá tăng */
+            --down-color: #ef4444; /* Đỏ khi giá giảm */
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .crypto-card {
+            background-color: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 500px;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .coin-info h2 {
+            margin: 0;
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .coin-info p {
+            margin: 5px 0 0 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .price-display {
+            text-align: right;
+        }
+
+        #currentPrice {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 0;
+            transition: color 0.3s ease;
+        }
+
+        /* Vùng chứa Canvas */
+        .chart-container {
+            position: relative;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 12px;
+            padding: 15px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+        }
+
+        .status {
+            text-align: center;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 15px;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: var(--up-color);
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="crypto-card">
+    <div class="header">
+        <div class="coin-info">
+            <h2>🟡 Bitcoin</h2>
+            <p>BTC / USDT (Binance)</p>
+        </div>
+        <div class="price-display">
+            <p id="currentPrice">Loading...</p>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="btcChart" width="450" height="200"></canvas>
+    </div>
+
+    <div class="status">
+        <span class="dot"></span> Cập nhật trực tiếp mỗi 2 giây
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('btcChart');
+    const ctx = canvas.getContext('2d');
+    const priceElement = document.getElementById('currentPrice');
+
+    // Mảng lưu trữ 30 điểm giá gần nhất
+    let priceHistory = [];
+    const MAX_DATA_POINTS = 30;
+    let lastPrice = 0;
+
+    // === 1. QUÁ TRÌNH FETCH DỮ LIỆU ===
+    async function fetchBitcoinPrice() {
+        try {
+            // Gọi API công khai của Binance
+            const response = await fetch('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT');
+            const data = await response.json();
+            const currentPrice = parseFloat(data.price);
+
+            updateDataAndUI(currentPrice);
+        } catch (error) {
+            console.error("Lỗi khi lấy dữ liệu:", error);
+        }
+    }
+
+    // === 2. XỬ LÝ DỮ LIỆU TRƯỚC KHI VẼ ===
+    function updateDataAndUI(newPrice) {
+        // Cập nhật text giá hiển thị và đổi màu Xanh/Đỏ
+        priceElement.innerText = "$" + newPrice.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        if (newPrice > lastPrice && lastPrice !== 0) {
+            priceElement.style.color = 'var(--up-color)';
+        } else if (newPrice < lastPrice && lastPrice !== 0) {
+            priceElement.style.color = 'var(--down-color)';
+        } else {
+            priceElement.style.color = 'var(--text-main)';
+        }
+        lastPrice = newPrice;
+
+        // Thêm giá mới vào mảng lịch sử
+        priceHistory.push(newPrice);
+
+        // Xóa phần tử cũ nhất nếu mảng dài hơn giới hạn (giúp biểu đồ cuộn sang trái)
+        if (priceHistory.length > MAX_DATA_POINTS) {
+            priceHistory.shift();
+        }
+
+        // Chỉ vẽ biểu đồ khi có ít nhất 2 điểm dữ liệu
+        if (priceHistory.length >= 2) {
+            drawChart();
+        }
+    }
+
+    // === 3. TOÁN HỌC & ĐƯA DỮ LIỆU LÊN CANVAS ===
+    function drawChart() {
+        // Bước quan trọng: Xóa trắng toàn bộ khung vẽ cũ trước khi vẽ khung mới
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const width = canvas.width;
+        const height = canvas.height;
+        const padding = 10; // Khoảng cách lề
+
+        // Tìm giá lớn nhất và nhỏ nhất để làm mốc scale Min-Max
+        const minPrice = Math.min(...priceHistory);
+        const maxPrice = Math.max(...priceHistory);
+
+        // Nếu giá không đổi, tạo một khoảng (range) ảo để tránh chia cho 0
+        const range = (maxPrice === minPrice) ? 1 : (maxPrice - minPrice);
+
+        // Tính toán khoảng cách trục X giữa các điểm
+        const stepX = (width - padding * 2) / (MAX_DATA_POINTS - 1);
+
+        // Bắt đầu vẽ đường nét
+        ctx.beginPath();
+        ctx.strokeStyle = '#f59e0b'; // Màu vàng Bitcoin
+        ctx.lineWidth = 3;
+        ctx.lineJoin = 'round'; // Làm mượt các góc nhọn
+
+        // Duyệt qua mảng lịch sử giá để tính tọa độ X, Y
+        priceHistory.forEach((price, index) => {
+            // Tọa độ X chạy từ trái sang phải
+            // Căn phải bằng cách đẩy dữ liệu mới nhất sát lề phải
+            const x = width - padding - ((priceHistory.length - 1 - index) * stepX);
+
+            // Tọa độ Y chuẩn hóa Min-Max (giá trị cao nằm ở trên, Y bằng 0 nằm ở trên cùng)
+            const normalizedY = (price - minPrice) / range;
+            const y = (height - padding) - (normalizedY * (height - padding * 2));
+
+            if (index === 0) {
+                ctx.moveTo(x, y);
+            } else {
+                ctx.lineTo(x, y);
+            }
+        });
+        ctx.stroke();
+
+        // Hiệu ứng Gradient mờ mờ đổ xuống dưới đường Line (Làm cho biểu đồ trông xịn hơn)
+        ctx.lineTo(width - padding, height); // Kéo xuống đáy phải
+        ctx.lineTo(width - padding - ((priceHistory.length - 1) * stepX), height); // Kéo sang đáy trái
+        ctx.closePath();
+
+        const gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, 'rgba(245, 158, 11, 0.3)'); // Vàng nhạt ở trên
+        gradient.addColorStop(1, 'rgba(245, 158, 11, 0)');   // Trong suốt ở dưới
+
+        ctx.fillStyle = gradient;
+        ctx.fill();
+    }
+
+    // === 4. KHỞI CHẠY VÀ LẶP LẠI (AUTO-UPDATE) ===
+    fetchBitcoinPrice(); // Gọi lần đầu ngay khi mở trang
+    setInterval(fetchBitcoinPrice, 2000); // Lặp lại việc gọi API mỗi 2 giây (2000ms)
+</script>
+</body>
+</html>

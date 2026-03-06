@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Canvas Analytics Dashboard | Vinh Nguyen</title>
+  <style>
+    /* === STYLE HIỆN ĐẠI (MODERN UI) === */
+    :root {
+        --bg-color: #f3f4f6;
+        --text-main: #1f2937;
+        --text-muted: #6b7280;
+        --card-bg: #ffffff;
+        --primary: #3b82f6; /* Xanh dương */
+        --success: #10b981; /* Xanh lá */
+        --warning: #f59e0b; /* Vàng cam */
+        --danger: #ef4444;  /* Đỏ */
+    }
+
+    body {
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        margin: 0;
+        padding: 40px 20px;
+    }
+
+    header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    header h1 {
+        margin: 0 0 10px 0;
+        font-size: 2.5rem;
+        color: var(--text-main);
+    }
+
+    header p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 1.1rem;
+    }
+
+    /* Bố cục Grid Responsive */
+    .dashboard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+        gap: 30px;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    /* Thẻ (Card) chứa biểu đồ */
+    .card {
+        background-color: var(--card-bg);
+        border-radius: 16px;
+        padding: 25px;
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.025);
+        transition: transform 0.2s ease;
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+    }
+
+    .card h2 {
+        margin-top: 0;
+        margin-bottom: 20px;
+        font-size: 1.25rem;
+        text-align: center;
+        color: var(--text-main);
+    }
+
+    /* Đồng bộ kích thước thẻ vẽ */
+    canvas {
+        display: block;
+        margin: 0 auto;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Canvas Data Analytics</h1>
+  <p>Tổng hợp các thuật toán vẽ biểu đồ bằng HTML5 Canvas</p>
+</header>
+
+<main class="dashboard">
+  <div class="card">
+    <h2>Hồi quy tuyến tính (Scatter Plot)</h2>
+    <canvas id="scatterChart" width="400" height="300"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Nguồn truy cập (Pie Chart)</h2>
+    <canvas id="pieChart" width="400" height="300"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Chuyển đổi Marketing (Bar Chart)</h2>
+    <canvas id="barChart" width="400" height="300"></canvas>
+  </div>
+
+  <div class="card">
+    <h2>Xu hướng giá vàng (Line Chart)</h2>
+    <canvas id="lineChart" width="400" height="300"></canvas>
+  </div>
+</main>
+
+<script>
+  // ==========================================
+  // 1. SCATTER PLOT & LINEAR REGRESSION
+  // ==========================================
+  const ctxScatter = document.getElementById('scatterChart').getContext('2d');
+  const scatterData = [
+      { x: 50, y: 250 }, { x: 120, y: 190 },
+      { x: 200, y: 160 }, { x: 270, y: 110 },
+      { x: 350, y: 60 }
+  ];
+
+  // Vẽ điểm phân tán
+  ctxScatter.fillStyle = '#3b82f6'; // Xanh dương
+  scatterData.forEach(point => {
+      ctxScatter.beginPath();
+      ctxScatter.arc(point.x, point.y, 6, 0, Math.PI * 2);
+      ctxScatter.fill();
+  });
+
+  // Vẽ đường xu hướng
+  ctxScatter.beginPath();
+  ctxScatter.moveTo(30, 270);
+  ctxScatter.lineTo(380, 40);
+  ctxScatter.strokeStyle = '#ef4444'; // Đỏ
+  ctxScatter.lineWidth = 3;
+  ctxScatter.stroke();
+
+
+  // ==========================================
+  // 2. PIE CHART (LƯỢNG GIÁC)
+  // ==========================================
+  const ctxPie = document.getElementById('pieChart').getContext('2d');
+  const pieData = [
+      { label: "SEO", value: 45, color: "#10b981" },     // Xanh lá
+      { label: "Social", value: 30, color: "#3b82f6" },  // Xanh dương
+      { label: "Direct", value: 25, color: "#f59e0b" }   // Vàng cam
+  ];
+
+  const centerX = 200, centerY = 150, radius = 120;
+  const total = pieData.reduce((sum, item) => sum + item.value, 0);
+  let startAngle = 0;
+
+  pieData.forEach(item => {
+      const sliceAngle = (item.value / total) * 2 * Math.PI;
+      const endAngle = startAngle + sliceAngle;
+
+      // Vẽ lát cắt
+      ctxPie.beginPath();
+      ctxPie.moveTo(centerX, centerY);
+      ctxPie.arc(centerX, centerY, radius, startAngle, endAngle);
+      ctxPie.closePath();
+      ctxPie.fillStyle = item.color;
+      ctxPie.fill();
+
+      // Lượng giác: Viết chữ vào giữa
+      const midAngle = startAngle + (sliceAngle / 2);
+      const labelRadius = radius * 0.6; // Đưa chữ vào sâu 60% bán kính
+      const textX = centerX + labelRadius * Math.cos(midAngle);
+      const textY = centerY + labelRadius * Math.sin(midAngle);
+
+      ctxPie.fillStyle = "#ffffff";
+      ctxPie.font = "bold 14px system-ui";
+      ctxPie.textAlign = "center";
+      ctxPie.textBaseline = "middle";
+      const percent = Math.round((item.value / total) * 100) + "%";
+      ctxPie.fillText(`${item.label} (${percent})`, textX, textY);
+
+      startAngle = endAngle; // Bàn giao góc cho vòng lặp sau
+  });
+
+
+  // ==========================================
+  // 3. BAR CHART (TỶ LỆ - SCALING)
+  // ==========================================
+  const ctxBar = document.getElementById('barChart').getContext('2d');
+  const barData = [
+      { label: "FB", val: 120 }, { label: "GG", val: 200 },
+      { label: "Mail", val: 150 }, { label: "Tik", val: 90 }
+  ];
+
+  const barW = 50, gap = 35, startX = 40, bottomY = 260, maxH = 200;
+  const maxVal = Math.max(...barData.map(d => d.val));
+
+  barData.forEach((item, index) => {
+      const h = (item.val / maxVal) * maxH; // Scale chiều cao
+      const x = startX + index * (barW + gap);
+      const y = bottomY - h; // Trục Y lật ngược
+
+      ctxBar.fillStyle = '#3b82f6'; // Xanh dương
+      // Vẽ cột với góc bo tròn phía trên (HTML5 Canvas nâng cao)
+      ctxBar.beginPath();
+      ctxBar.roundRect(x, y, barW, h, [6, 6, 0, 0]);
+      ctxBar.fill();
+
+      // Nhãn
+      ctxBar.fillStyle = '#6b7280';
+      ctxBar.font = "14px system-ui";
+      ctxBar.textAlign = "center";
+      ctxBar.fillText(item.label, x + barW/2, bottomY + 20);
+
+      // Số liệu
+      ctxBar.fillStyle = '#1f2937';
+      ctxBar.font = "bold 13px system-ui";
+      ctxBar.fillText(item.val, x + barW/2, y - 8);
+  });
+
+
+  // ==========================================
+  // 4. LINE CHART (MIN-MAX NORMALIZATION)
+  // ==========================================
+  const ctxLine = document.getElementById('lineChart').getContext('2d');
+  const lineData = [
+      { day: "T2", price: 82.5 }, { day: "T3", price: 83.1 },
+      { day: "T4", price: 82.8 }, { day: "T5", price: 84.0 },
+      { day: "T6", price: 84.5 }
+  ];
+
+  const lineW = 320, lineBottomY = 250, lineMaxH = 180;
+  const stepX = lineW / (lineData.length - 1);
+
+  // Trừ/Cộng hao lề để biểu đồ không chạm mép
+  const minPrice = Math.min(...lineData.map(d => d.price)) - 0.5;
+  const maxPrice = Math.max(...lineData.map(d => d.price)) + 0.5;
+  const range = maxPrice - minPrice;
+
+  ctxLine.beginPath();
+  ctxLine.strokeStyle = '#f59e0b'; // Vàng cam
+  ctxLine.lineWidth = 3;
+
+  lineData.forEach((item, index) => {
+      const x = 40 + index * stepX;
+      // Chuẩn hóa Min-Max
+      const normY = (item.price - minPrice) / range;
+      const y = lineBottomY - (normY * lineMaxH);
+
+      if (index === 0) ctxLine.moveTo(x, y);
+      else ctxLine.lineTo(x, y);
+  });
+  ctxLine.stroke(); // Vẽ đường nét
+
+  // Vẽ các điểm (Dots) đè lên đường nét
+  lineData.forEach((item, index) => {
+      const x = 40 + index * stepX;
+      const normY = (item.price - minPrice) / range;
+      const y = lineBottomY - (normY * lineMaxH);
+
+      // Chấm tròn
+      ctxLine.beginPath();
+      ctxLine.arc(x, y, 5, 0, Math.PI * 2);
+      ctxLine.fillStyle = '#ffffff';
+      ctxLine.fill();
+      ctxLine.lineWidth = 2;
+      ctxLine.strokeStyle = '#ef4444'; // Đỏ
+      ctxLine.stroke();
+
+      // Nhãn
+      ctxLine.fillStyle = '#6b7280';
+      ctxLine.font = "14px system-ui";
+      ctxLine.textAlign = "center";
+      ctxLine.fillText(item.day, x, lineBottomY + 25);
+      ctxLine.fillStyle = '#1f2937';
+      ctxLine.font = "bold 12px system-ui";
+      ctxLine.fillText(item.price, x, y - 12);
+  });
+</script>
+</body>
+</html>
