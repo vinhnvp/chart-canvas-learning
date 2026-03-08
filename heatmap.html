@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Website Traffic Analysis | nvinh.com</title>
+    <style>
+        /* === TỔNG QUAN UI/UX === */
+        :root {
+            --bg-page: #f8fafc;
+            --bg-card: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --primary: #2563eb; /* Xanh đậm chủ đạo */
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .dashboard-container {
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        /* Phần Header và KPI */
+        header {
+            margin-bottom: 30px;
+        }
+
+        h1 { margin: 0 0 5px 0; font-size: 1.8rem; }
+        p.subtitle { margin: 0; color: var(--text-muted); }
+
+        .kpi-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .kpi-card {
+            flex: 1;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+        }
+
+        .kpi-card h3 { margin: 0 0 10px 0; font-size: 0.9rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;}
+        .kpi-card .value { margin: 0; font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+
+        /* Vùng chứa Biểu đồ Heatmap */
+        .chart-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+            position: relative; /* Rất quan trọng để định vị Tooltip */
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            cursor: crosshair;
+        }
+
+        /* Tooltip tương tác cực mượt */
+        #tooltip {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.9);
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            pointer-events: none; /* Không che mất sự kiện di chuột của canvas */
+            opacity: 0;
+            transition: opacity 0.2s;
+            transform: translate(-50%, -120%);
+            white-space: nowrap;
+            z-index: 10;
+        }
+
+        /* Chú thích màu sắc (Legend) */
+        .legend {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            margin-top: 20px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            gap: 10px;
+        }
+
+        .gradient-bar {
+            width: 150px;
+            height: 12px;
+            border-radius: 6px;
+            background: linear-gradient(to right, #eff6ff, #1d4ed8);
+        }
+    </style>
+</head>
+<body>
+
+<div class="dashboard-container">
+    <header>
+        <h1>Phân tích Lượng truy cập Website</h1>
+        <p class="subtitle">Bản đồ nhiệt theo Khung giờ và Ngày trong tuần (Tháng 11/2026)</p>
+    </header>
+
+    <div class="kpi-row">
+        <div class="kpi-card">
+            <h3>Tổng Sessions</h3>
+            <p class="value" id="kpi-total">0</p>
+        </div>
+        <div class="kpi-card">
+            <h3>Ngày cao điểm</h3>
+            <p class="value">Thứ Tư</p>
+        </div>
+        <div class="kpi-card">
+            <h3>Giờ vàng (Peak)</h3>
+            <p class="value">10:00 - 11:00</p>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <div id="tooltip"></div>
+
+        <canvas id="heatmapCanvas" width="900" height="350"></canvas>
+
+        <div class="legend">
+            <span>Ít truy cập</span>
+            <div class="gradient-bar"></div>
+            <span>Nhiều truy cập</span>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('heatmapCanvas');
+    const ctx = canvas.getContext('2d');
+    const tooltip = document.getElementById('tooltip');
+
+    // Cấu hình không gian vẽ
+    const days = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+    const hours = Array.from({length: 24}, (_, i) => i + 'h');
+
+    const paddingLeft = 40;
+    const paddingTop = 20;
+    const cellWidth = (canvas.width - paddingLeft) / 24;
+    const cellHeight = (canvas.height - paddingTop) / 7;
+
+    // 1. HÀM GIẢ LẬP DỮ LIỆU (Mock Data Generation)
+    // Tạo ra 168 điểm dữ liệu (7 ngày x 24 giờ)
+    let totalSessions = 0;
+    const heatData = [];
+
+    for (let d = 0; d < 7; d++) {
+        heatData[d] = [];
+        for (let h = 0; h < 24; h++) {
+            let baseTraffic = 50; // Traffic cơ bản lúc nửa đêm
+
+            // Quy luật: Ban ngày traffic cao hơn ban đêm
+            if (h > 7 && h < 22) baseTraffic += 150;
+
+            // Quy luật: Giờ hành chính T2 - T6 (9h-11h và 14h-16h) rất cao
+            if (d < 5 && ((h >= 9 && h <= 11) || (h >= 14 && h <= 16))) {
+                baseTraffic += 400;
+            }
+
+            // Quy luật: Cuối tuần (T7, CN) traffic thấp rải rác
+            if (d >= 5) baseTraffic -= 100;
+
+            // Thêm độ nhiễu ngẫu nhiên (Randomness) để dữ liệu trông tự nhiên
+            const noise = Math.floor(Math.random() * 150);
+            const finalTraffic = Math.max(0, baseTraffic + noise); // Không để số âm
+
+            heatData[d][h] = finalTraffic;
+            totalSessions += finalTraffic;
+        }
+    }
+
+    // Cập nhật số tổng lên KPI Card
+    document.getElementById('kpi-total').innerText = totalSessions.toLocaleString('vi-VN');
+
+    // Tìm giá trị max để tính tỷ lệ màu (Scaling)
+    const maxTraffic = Math.max(...heatData.flat());
+
+    // 2. HÀM VẼ HEATMAP
+    function drawHeatmap() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Vẽ nhãn Giờ (Trục X)
+        ctx.fillStyle = '#64748b';
+        ctx.font = '13px Inter';
+        ctx.textAlign = 'center';
+        for (let h = 0; h < 24; h++) {
+            // Chỉ hiển thị nhãn chẵn để đỡ rối mắt
+            if (h % 2 === 0) {
+                ctx.fillText(hours[h], paddingLeft + h * cellWidth + cellWidth / 2, 15);
+            }
+        }
+
+        // Vẽ lưới các ô vuông
+        for (let d = 0; d < 7; d++) {
+            // Vẽ nhãn Ngày (Trục Y)
+            ctx.fillStyle = '#1e293b';
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(days[d], paddingLeft - 10, paddingTop + d * cellHeight + cellHeight / 2);
+
+            for (let h = 0; h < 24; h++) {
+                const value = heatData[d][h];
+
+                // Toán học: Chuẩn hóa dữ liệu để tìm độ đậm nhạt (Alpha channel)
+                // Giá trị nhỏ nhất là màu nền nhạt, lớn nhất là xanh đậm.
+                const intensity = value / maxTraffic;
+
+                // Sử dụng rgba với màu Xanh chủ đạo (29, 78, 216) của Tailwind CSS
+                ctx.fillStyle = `rgba(29, 78, 216, ${intensity})`;
+
+                const x = paddingLeft + h * cellWidth;
+                const y = paddingTop + d * cellHeight;
+
+                // Vẽ ô vuông (có chừa 2px làm đường viền phân cách bằng cách giảm width/height)
+                ctx.fillRect(x + 1, y + 1, cellWidth - 2, cellHeight - 2);
+            }
+        }
+    }
+
+    drawHeatmap();
+
+    // 3. TƯƠNG TÁC: HIỂN THỊ TOOLTIP KHI DI CHUỘT
+    canvas.addEventListener('mousemove', (event) => {
+        // Lấy tọa độ chuột tương đối so với thẻ canvas
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        const mouseY = event.clientY - rect.top;
+
+        // Xác định chuột đang nằm ở ô (Cột Giờ, Hàng Ngày) nào
+        const col = Math.floor((mouseX - paddingLeft) / cellWidth);
+        const row = Math.floor((mouseY - paddingTop) / cellHeight);
+
+        // Nếu chuột nằm trong vùng có dữ liệu hợp lệ
+        if (col >= 0 && col < 24 && row >= 0 && row < 7) {
+            const value = heatData[row][col];
+
+            // Hiển thị và cập nhật nội dung Tooltip
+            tooltip.style.opacity = 1;
+            tooltip.innerHTML = `<strong>${days[row]} lúc ${col}:00</strong><br/>${value.toLocaleString()} sessions`;
+
+            // Cập nhật vị trí Tooltip đi theo chuột
+            // (cộng thêm vị trí của thẻ chart-card chứa nó)
+            tooltip.style.left = event.clientX - rect.left + 'px';
+            tooltip.style.top = event.clientY - rect.top + 'px';
+        } else {
+            tooltip.style.opacity = 0; // Ẩn nếu chuột trỏ ra ngoài viền lề
+        }
+    });
+
+    // Ẩn Tooltip khi di chuột hẳn ra ngoài canvas
+    canvas.addEventListener('mouseleave', () => {
+        tooltip.style.opacity = 0;
+    });
+
+</script>
+</body>
+</html>
