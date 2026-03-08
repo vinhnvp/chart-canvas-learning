@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Landing Page Click Heatmap</title>
+    <style>
+        :root {
+            --bg-page: #e2e8f0;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+        }
+
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 20px;
+            margin: 0;
+        }
+
+        .header-text {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .header-text h1 { margin: 0 0 10px 0; }
+        .header-text p { color: #475569; margin: 0; }
+
+        .heatmap-wrapper {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        canvas {
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            cursor: crosshair;
+        }
+
+        .instruction {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #64748b;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div class="header-text">
+    <h1>Bản đồ nhiệt thao tác (Click Heatmap)</h1>
+    <p>Phân tích tỷ lệ nhấp (CTR) trên Landing Page</p>
+</div>
+
+<div class="heatmap-wrapper">
+    <canvas id="uiHeatmap" width="800" height="500"></canvas>
+    <div class="instruction">💡 Mẹo: Nhấp chuột liên tục vào một vị trí bất kỳ trên khung web để thấy vùng đó "nóng" lên!</div>
+</div>
+
+<script>
+    const canvas = document.getElementById('uiHeatmap');
+    const ctx = canvas.getContext('2d');
+
+    // --- 1. VẼ GIAO DIỆN WEB GIẢ LẬP (WIRE FRAME) ---
+    function drawWebsiteWireframe() {
+        // Xóa phông nền
+        ctx.fillStyle = '#f8fafc';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Thanh Navigation (Header)
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(0, 0, canvas.width, 60);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 20px Arial';
+        ctx.fillText('LogoSite', 30, 38);
+        ctx.font = '14px Arial';
+        ctx.fillText('Trang chủ', 500, 35);
+        ctx.fillText('Dịch vụ', 590, 35);
+        ctx.fillText('Tuyển dụng', 660, 35);
+
+        // Hero Banner (Ảnh lớn)
+        ctx.fillStyle = '#e2e8f0';
+        ctx.fillRect(40, 90, 350, 250);
+        ctx.fillStyle = '#94a3b8';
+        ctx.textAlign = 'center';
+        ctx.fillText('[Hình ảnh/Video Giới thiệu]', 215, 220);
+
+        // Tiêu đề & Nội dung
+        ctx.textAlign = 'left';
+        ctx.fillStyle = '#0f172a';
+        ctx.font = 'bold 28px Arial';
+        ctx.fillText('Tuyển Dụng Kỹ Sư 2026', 430, 140);
+
+        ctx.fillStyle = '#475569';
+        ctx.font = '16px Arial';
+        ctx.fillText('Tham gia cùng đội ngũ chuyên gia hàng đầu.', 430, 180);
+        ctx.fillText('Môi trường làm việc quốc tế, thu nhập hấp dẫn.', 430, 210);
+
+        // Nút Call-to-Action (CTA) quan trọng
+        ctx.fillStyle = '#2563eb'; // Xanh dương nổi bật
+        ctx.beginPath();
+        ctx.roundRect(430, 250, 180, 50, 8);
+        ctx.fill();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('ĐĂNG KÝ NGAY', 520, 280);
+
+        // Các thẻ thông tin phụ (Features)
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(40, 380, 220, 80);
+        ctx.fillRect(290, 380, 220, 80);
+        ctx.fillRect(540, 380, 220, 80);
+    }
+
+    // --- 2. TẠO DỮ LIỆU CLICK CHUỘT ---
+    let clicks = [];
+
+    function generateMockClicks() {
+        // Tạo cụm click KHỔNG LỒ ngay tại nút CTA (chứng tỏ nút đang hoạt động tốt)
+        for(let i=0; i<80; i++) {
+            clicks.push({
+                x: 430 + Math.random() * 180,
+                y: 250 + Math.random() * 50,
+                intensity: 0.8
+            });
+        }
+
+        // Cụm click vào menu "Tuyển dụng"
+        for(let i=0; i<30; i++) {
+            clicks.push({
+                x: 650 + Math.random() * 80,
+                y: 20 + Math.random() * 30,
+                intensity: 0.5
+            });
+        }
+
+        // Click nhầm vào hình ảnh (Khách hàng tưởng ảnh click được)
+        for(let i=0; i<40; i++) {
+            clicks.push({
+                x: 100 + Math.random() * 200,
+                y: 150 + Math.random() * 100,
+                intensity: 0.4
+            });
+        }
+
+        // Click rải rác linh tinh trên trang (Noise)
+        for(let i=0; i<50; i++) {
+            clicks.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                intensity: 0.2
+            });
+        }
+    }
+
+    // --- 3. VẼ LỚP HEATMAP LÊN TRÊN ---
+    function drawClickHeatmap() {
+        // Đầu tiên luôn phải vẽ lại lớp giao diện web nền
+        drawWebsiteWireframe();
+
+        // Setup chế độ hòa trộn cho Heatmap
+        ctx.globalCompositeOperation = 'multiply'; // Dùng multiply nền sáng sẽ cho màu đẹp hơn lighter
+
+        clicks.forEach(click => {
+            const radius = 40; // Độ to của mỗi "vệt" click
+            const gradient = ctx.createRadialGradient(click.x, click.y, 0, click.x, click.y, radius);
+
+            // Màu lan tỏa: Đỏ rực ở tâm -> Vàng -> Trong suốt
+            // Dùng chuẩn màu RGBA
+            gradient.addColorStop(0, `rgba(255, 0, 0, ${click.intensity * 0.5})`);
+            gradient.addColorStop(0.5, `rgba(255, 255, 0, ${click.intensity * 0.2})`);
+            gradient.addColorStop(1, 'rgba(0, 0, 255, 0)');
+
+            ctx.beginPath();
+            ctx.arc(click.x, click.y, radius, 0, Math.PI * 2);
+            ctx.fillStyle = gradient;
+            ctx.fill();
+        });
+
+        // Reset lại chế độ hòa trộn
+        ctx.globalCompositeOperation = 'source-over';
+    }
+
+    // Khởi chạy
+    generateMockClicks();
+    drawClickHeatmap();
+
+    // Tương tác: Lắng nghe thao tác click của chính bạn để cập nhật Heatmap
+    canvas.addEventListener('click', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Mỗi lần bạn click, đẩy thêm 5 điểm "nhiệt" quanh tọa độ đó để hiệu ứng rõ rệt
+        for(let i=0; i<5; i++) {
+            clicks.push({
+                x: mouseX + (Math.random() - 0.5) * 20,
+                y: mouseY + (Math.random() - 0.5) * 20,
+                intensity: 0.6
+            });
+        }
+        // Vẽ lại toàn bộ
+        drawClickHeatmap();
+    });
+
+</script>
+</body>
+</html>
